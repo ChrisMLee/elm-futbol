@@ -1,10 +1,9 @@
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Html.App
 
 main =
-    Html.App.program
+    Html.program
         { init = init
         , view = view
         , update = update
@@ -79,8 +78,7 @@ init =
          , result = { goalsHomeTeam = 1 , goalsAwayTeam = 3 }
          , competition = 438
         }
-      , 
-        {  date = "2016-10-15T14:15:00Z" 
+      , {  date = "2016-10-15T14:15:00Z" 
          , status = "FINISHED" 
          , matchday = 8 
          , homeTeamName = "FC Barcelona" 
@@ -88,7 +86,14 @@ init =
          , result = { goalsHomeTeam = 4 , goalsAwayTeam = 0 }
          , competition = 436
         }
-
+      , {  date = "2016-10-14T18:30:00Z" 
+         , status = "FINISHED" 
+         , matchday = 7 
+         , homeTeamName = "Borussia Dortmund" 
+         , awayTeamName = "Hertha BSC"
+         , result = { goalsHomeTeam = 1, goalsAwayTeam = 1 }
+         , competition = 430
+        }
         ]), Cmd.none)
 
 -- The exclamation point in model ! [] is just a short-hand function for (model, Cmd.batch []), 
@@ -117,14 +122,17 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    --let
-    --  checkedLeagues = List.map (\x -> x.competition) << List.filter (\x -> x.checked) model.leagues 
-    --  visibleFixtures = List.filter (\x -> ) model.fixtures
-    --in 
+    let
+      checkedLeagues = List.map .id <| List.filter .checked model.leagues
+
+      --_ = Debug.log "checkedLeagues" <| toString checkedLeagues
+      visibleFixtures = List.filter (\x -> List.member x.competition checkedLeagues) model.fixtures
+      _ = Debug.log "visibleFixtures" <| toString visibleFixtures
+    in 
     div []
         [ 
           checkboxList model
-          , fixtureList model
+          , fixtureList visibleFixtures
         ]
 
 boolToString : Bool -> String 
@@ -135,13 +143,13 @@ leagueView : League -> Html Msg
 leagueView league =
     div[][
       label [] [ text league.name, text (boolToString league.checked) ]
-    , input [ type' "checkbox", onClick (Check league.id (not league.checked)) ] []
+    , input [ type_ "checkbox", checked league.checked, onClick (Check league.id (not league.checked)) ] []
     ]
 
-fixtureList : Model -> Html Msg
-fixtureList model =
+fixtureList : List Fixture -> Html Msg
+fixtureList fixtures =
   div []
-    (List.map fixtureView model.fixtures)
+    (List.map fixtureView fixtures)
 
 fixtureView: Fixture -> Html Msg
 fixtureView fixture =
