@@ -82,8 +82,8 @@ type alias FixtureResultHalfTime =
     }
 
 type alias FixtureResult =
-    { goalsHomeTeam : Int
-    , goalsAwayTeam : Int
+    { goalsHomeTeam : Maybe Int
+    , goalsAwayTeam : Maybe Int
     , halfTime : FixtureResultHalfTime
     }
 
@@ -136,9 +136,10 @@ decodeFixtureResultHalfTime =
 decodeFixtureResult : Json.Decode.Decoder FixtureResult
 decodeFixtureResult =
     Json.Decode.Pipeline.decode FixtureResult
-        |> Json.Decode.Pipeline.required "goalsHomeTeam" (Json.Decode.int)
-        |> Json.Decode.Pipeline.required "goalsAwayTeam" (Json.Decode.int)
-        |> Json.Decode.Pipeline.required "halfTime" (decodeFixtureResultHalfTime)
+        |> Json.Decode.Pipeline.required "goalsHomeTeam" (Json.Decode.nullable Json.Decode.int)
+        |> Json.Decode.Pipeline.required "goalsAwayTeam" (Json.Decode.nullable Json.Decode.int)
+        |> Json.Decode.Pipeline.optional "halfTime" (decodeFixtureResultHalfTime) ({ goalsHomeTeam = 0
+    , goalsAwayTeam = 0})
 
 fixtureListDecoder : Json.Decode.Decoder (List Fixture)
 fixtureListDecoder = Json.Decode.list decodeFixture
@@ -170,8 +171,8 @@ init =
     homeTeamName= "Bayer Leverkusen",
     awayTeamName= "Red Bull Leipzig",
     result= {
-      goalsHomeTeam= 2,
-      goalsAwayTeam= 3,
+      goalsHomeTeam= (Just 2),
+      goalsAwayTeam= (Just 3),
       halfTime= {
         goalsHomeTeam= 2,
         goalsAwayTeam= 1
@@ -284,7 +285,7 @@ subscriptions model =
 
 getFixtures: Int -> Int -> String -> String -> Cmd Msg
 getFixtures competition season startDate endDate =
-  Http.send updateFixtures (Http.get "http://localhost:8080/fixtures/430/2016/2016-11-14/2016-11-28" fixtureListDecoder)
+  Http.send updateFixtures (Http.get "http://localhost:8080/fixtures/436/2016/2017-02-10/2017-02-11" fixtureListDecoder)
 
 updateFixtures result =
     case result of
