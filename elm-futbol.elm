@@ -87,6 +87,13 @@ type alias FixtureResult =
     , halfTime : FixtureResultHalfTime
     }
 
+type alias Competitions = List String
+type alias StartTime = String
+type alias EndTime = String
+type alias Season = String
+type alias Url = String
+
+
 decodeFixture : Json.Decode.Decoder Fixture
 decodeFixture =
     Json.Decode.Pipeline.decode Fixture
@@ -212,8 +219,10 @@ update msg model =
         ({model | error = (toString err)}, Cmd.none)
 
       ClickFetchData ->
-            ( model, getFixtures 430 2016 "2016-11-14" "2016-11-28" )
-
+            let 
+              leagueIdList = List.map toString <| List.map (\league -> league.id) model.leagues
+            in 
+              (model, getFixtures (makeFixtureUrl "2016" "2016-11-14" "2016-11-28" leagueIdList))
 
 boolToString : Bool -> String 
 boolToString x = if x then " True" else " False"
@@ -283,9 +292,20 @@ subscriptions model =
 
 -- HTTP
 
-getFixtures: Int -> Int -> String -> String -> Cmd Msg
-getFixtures competition season startDate endDate =
-  Http.send updateFixtures (Http.get "http://localhost:8080/fixtures/436/2016/2017-02-10/2017-02-11" fixtureListDecoder)
+makeFixtureUrl : Season -> StartTime -> EndTime -> Competitions -> Url
+makeFixtureUrl season starttime endtime competitions = 
+  "http://localhost:8080/fixtures/" ++ season 
+                                    ++ "/"
+                                    ++ starttime
+                                    ++ "/"
+                                    ++ endtime 
+                                    ++ "?" 
+                                    ++ "competitions="
+                                    ++ String.join "," competitions
+
+getFixtures: Url -> Cmd Msg
+getFixtures url =
+  Http.send updateFixtures (Http.get url fixtureListDecoder)
 
 updateFixtures result =
     case result of
