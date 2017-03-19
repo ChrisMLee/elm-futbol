@@ -6,7 +6,10 @@ import Json.Decode exposing (..)
 import Json.Decode.Pipeline
 import Http
 import Task exposing (..)
+import Date.Extra.Core exposing (monthToInt)
 
+import Date exposing (Date, Day(..), day, dayOfWeek, month, year)
+import DatePicker exposing (defaultSettings)
 
 main =
     Html.program
@@ -34,6 +37,8 @@ type alias Model =
       leagues : List League
     , fixtures: List Fixture
     , error: String
+    , date : Maybe Date
+    , datePicker : DatePicker.DatePicker
     }
 
 type alias League =
@@ -153,10 +158,14 @@ fixtureListDecoder = Json.Decode.list decodeFixture
 
 init : (Model, Cmd Msg)
 init =
+  let 
+     ( datePicker, datePickerFx ) = DatePicker.init defaultSettings
+  in
   ((Model [ { name = "Premier League", checked = True, id = 426}
               , { name = "La Liga", checked = True, id = 436}
               , { name = "Bundesliga", checked = True, id = 430}
               , { name = "Serie A", checked = True, id = 438}
+              , { name = "Champions League", checked = True, id = 440}
     ] [{
     links= {
       self= {
@@ -186,7 +195,7 @@ init =
       }
     },
     competition= 430
-  }] "No Error"), Cmd.none)
+  }] "No Error" Nothing datePicker), Cmd.batch[ Cmd.map ToDatePicker datePickerFx ])
 
 -- The exclamation point in model ! [] is just a short-hand function for (model, Cmd.batch []), 
 -- which is the type returned from typical update statements
@@ -196,7 +205,8 @@ type Msg
     = Check Int Bool
     | ErrorOccurred Http.Error
     | DataFetched (List Fixture)
-    | ClickFetchData
+    | FetchFixtures (Maybe Date)
+    | ToDatePicker DatePicker.Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -218,11 +228,52 @@ update msg model =
       ErrorOccurred err ->
         ({model | error = (toString err)}, Cmd.none)
 
-      ClickFetchData ->
-            let 
-              leagueIdList = List.map toString <| List.map (\league -> league.id) model.leagues
+      FetchFixtures mDate ->
+            let
+              action = 
+                case mDate of
+                    Nothing -> 
+                      Cmd.none
+                    Just date ->
+                      let 
+                        leagueIdList = List.map toString << List.map (\league -> league.id) <| model.leagues
+                        url = makeFixtureUrl "2016" "2016-11-14" "2016-11-28" leagueIdList
+                      in
+                        getFixtures url
             in 
-              (model, getFixtures (makeFixtureUrl "2016" "2016-11-14" "2016-11-28" leagueIdList))
+              (model, action)
+
+      ToDatePicker msg ->
+            let
+                ( newDatePicker, datePickerFx, mDate ) =
+                    DatePicker.update msg model.datePicker
+                one = Debug.log "date" date
+                date =
+                    case mDate of
+                        Nothing ->
+                            model.date
+
+                        date ->
+                            date
+
+                fetchAction = 
+                    case mDate of
+                        Nothing -> 
+                          Cmd.none
+                        Just date ->
+                          let
+                            five =  Debug.log "formatted" (formatIncomingDate date)
+                            formattedDate = formatIncomingDate date
+                            leagueIdList = List.map toString << List.map (\league -> league.id) <| model.leagues
+                            url = makeFixtureUrl (toString <| year date) formattedDate formattedDate leagueIdList
+                          in
+                            getFixtures url
+            in
+                { model
+                    | date = date
+                    , datePicker = newDatePicker
+                }
+                    ! [ Cmd.map ToDatePicker datePickerFx,  fetchAction ]
 
 boolToString : Bool -> String 
 boolToString x = if x then " True" else " False"
@@ -236,19 +287,34 @@ view model =
 
       --_ = Debug.log "checkedLeagues" <| toString checkedLeagues
       visibleFixtures = List.filter (\x -> List.member x.competition checkedLeagues) model.fixtures
-      _ = Debug.log "visibleFixtures" <| toString visibleFixtures
+      --_ = Debug.log "visibleFixtures" <| toString visibleFixtures
     in 
     div []
         [ 
-          checkboxList model
+            datePickerView model.date model.datePicker
+          , checkboxList model
           , div []
             [
               text model.error
             ]
           , fixtureList visibleFixtures
-          ,  button [ onClick ClickFetchData ] [ text "fetch" ]
         ]
 
+datePickerView : Maybe Date -> DatePicker.DatePicker -> Html Msg 
+datePickerView date datePicker = div []
+                     [ case date of
+                          Nothing ->
+                              h1 [] [ text "Pick a date" ]
+
+                          Just date ->
+                              h1 [] [ text <| formatDate date ]
+                      , DatePicker.view datePicker
+                          |> Html.map ToDatePicker
+                      ]
+
+formatDate : Date -> String
+formatDate d =
+    toString (month d) ++ " " ++ toString (day d) ++ ", " ++ toString (year d)
 
 --onClick (Check todo.id (not todo.completed))
 leagueView : League -> Html Msg
@@ -314,6 +380,14 @@ updateFixtures result =
         Ok val ->
             DataFetched val 
         
+
+-- Helpers
+
+formatIncomingDate : Date -> String
+formatIncomingDate date = String.join "-" [ (toString <| year date), (twoDigit <| monthToInt <| month date), (twoDigit <|day date)]
+
+twoDigit : Int -> String
+twoDigit int = if int > 9 then toString <| int else "0" ++ (toString <| int)
 
 
 --update : Msg -> Model -> (Model, Cmd Msg)
